@@ -1,0 +1,1830 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="description" content="SuperAhorro GBA - Ofertas y descuentos en supermercados zona norte GBA">
+<meta name="theme-color" content="#e8651a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SuperAhorro">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<title>🛒 SuperAhorro GBA</title>
+
+<style>
+/* ─── Variables ────────────────────────────────────────────────────────────── */
+:root {
+  --c-bg: #0f0f1a;
+  --c-surface: #1a1a2e;
+  --c-surface2: #22223a;
+  --c-border: #2e2e50;
+  --c-accent: #e8651a;
+  --c-accent2: #f0a500;
+  --c-text: #eeeef8;
+  --c-text2: #9999bb;
+  --c-green: #22c55e;
+  --c-red: #ef4444;
+  --c-blue: #3b82f6;
+  --nav-h: 64px;
+  --radius: 14px;
+  --shadow: 0 4px 24px rgba(0,0,0,.4);
+  font-size: 16px;
+}
+.light {
+  --c-bg: #f5f5f0;
+  --c-surface: #ffffff;
+  --c-surface2: #f0efe8;
+  --c-border: #e2e0d8;
+  --c-text: #1a1a2e;
+  --c-text2: #666680;
+}
+
+/* ─── Reset & Base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--c-bg);
+  color: var(--c-text);
+  transition: background .3s, color .3s;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+input, textarea, select { user-select: text; }
+
+/* ─── Layout ───────────────────────────────────────────────────────────────── */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  height: 100vh;
+}
+#header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 8px;
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-border);
+  flex-shrink: 0;
+  gap: 8px;
+}
+#header h1 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--c-accent);
+  white-space: nowrap;
+}
+#header-actions { display: flex; gap: 8px; align-items: center; }
+.icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.3rem;
+  padding: 6px;
+  border-radius: 8px;
+  transition: background .2s;
+  color: var(--c-text);
+}
+.icon-btn:active { background: var(--c-border); }
+
+#pages {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.page { display: none; padding: 16px 16px 80px; }
+.page.active { display: block; }
+
+#nav {
+  display: flex;
+  background: var(--c-surface);
+  border-top: 1px solid var(--c-border);
+  height: var(--nav-h);
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+}
+.nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 4px;
+  color: var(--c-text2);
+  font-size: .65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  transition: color .2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.nav-btn .nav-icon { font-size: 1.4rem; }
+.nav-btn.active { color: var(--c-accent); }
+.nav-btn:active { opacity: .7; }
+
+/* ─── Cards & Common ───────────────────────────────────────────────────────── */
+.card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.card-title {
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--c-text2);
+  margin-bottom: 10px;
+}
+.badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-size: .75rem;
+  font-weight: 700;
+}
+.badge-green { background: rgba(34,197,94,.15); color: var(--c-green); }
+.badge-orange { background: rgba(232,101,26,.15); color: var(--c-accent); }
+.badge-blue { background: rgba(59,130,246,.15); color: var(--c-blue); }
+.badge-yellow { background: rgba(240,165,0,.15); color: var(--c-accent2); }
+
+.pill-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.pill {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: .8rem;
+  border: 1.5px solid var(--c-border);
+  background: var(--c-surface2);
+  cursor: pointer;
+  font-weight: 600;
+  transition: all .2s;
+  color: var(--c-text);
+}
+.pill.active {
+  background: var(--c-accent);
+  border-color: var(--c-accent);
+  color: #fff;
+}
+
+.input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+input[type="text"], input[type="number"], select {
+  background: var(--c-surface2);
+  border: 1.5px solid var(--c-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--c-text);
+  font-size: .9rem;
+  outline: none;
+  width: 100%;
+  transition: border-color .2s;
+}
+input:focus, select:focus { border-color: var(--c-accent); }
+
+.btn {
+  padding: 12px 18px;
+  border-radius: 10px;
+  border: none;
+  font-size: .9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .2s, transform .1s;
+  white-space: nowrap;
+}
+.btn:active { opacity: .8; transform: scale(.98); }
+.btn-primary { background: var(--c-accent); color: #fff; }
+.btn-secondary { background: var(--c-surface2); color: var(--c-text); border: 1.5px solid var(--c-border); }
+.btn-sm { padding: 8px 14px; font-size: .8rem; }
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--c-text2);
+}
+.empty-state .empty-icon { font-size: 3rem; margin-bottom: 10px; }
+.empty-state p { font-size: .9rem; line-height: 1.5; }
+
+.loading { text-align: center; padding: 30px; color: var(--c-text2); }
+.loading::after {
+  content: '';
+  display: inline-block;
+  width: 24px; height: 24px;
+  border: 3px solid var(--c-border);
+  border-top-color: var(--c-accent);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+  margin-left: 10px;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Dashboard ─────────────────────────────────────────────────────────────── */
+.alert-banner {
+  background: linear-gradient(135deg, var(--c-accent) 0%, #c0450a 100%);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 14px;
+  color: #fff;
+}
+.alert-banner h2 { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+.alert-banner p { font-size: .85rem; opacity: .9; line-height: 1.4; }
+
+.dia-hoy {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--c-surface);
+  border: 2px solid var(--c-accent);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.dia-circle {
+  width: 52px; height: 52px;
+  background: var(--c-accent);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: .65rem;
+  color: #fff;
+  letter-spacing: .05em;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+.dia-circle span { font-size: 1.4rem; line-height: 1; }
+
+.banco-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: var(--c-surface2);
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+.banco-icon { font-size: 1.5rem; }
+.banco-info { flex: 1; }
+.banco-nombre { font-weight: 700; font-size: .9rem; }
+.banco-detalle { font-size: .78rem; color: var(--c-text2); }
+.banco-pct {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: var(--c-green);
+}
+
+.oferta-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: var(--c-surface2);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: background .2s;
+}
+.oferta-item:active { background: var(--c-border); }
+.oferta-img {
+  width: 52px; height: 52px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--c-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+.oferta-info { flex: 1; min-width: 0; }
+.oferta-nombre {
+  font-weight: 600;
+  font-size: .88rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.oferta-super { font-size: .75rem; color: var(--c-text2); }
+.oferta-precios { text-align: right; flex-shrink: 0; }
+.oferta-precio { font-size: 1rem; font-weight: 800; color: var(--c-accent); }
+.oferta-anterior {
+  font-size: .75rem;
+  color: var(--c-text2);
+  text-decoration: line-through;
+}
+.oferta-descuento {
+  font-size: .75rem;
+  font-weight: 700;
+  color: var(--c-green);
+}
+
+/* ─── Ofertas Page ──────────────────────────────────────────────────────────── */
+.filter-bar {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.search-input-wrap {
+  position: relative;
+  margin-bottom: 10px;
+}
+.search-input-wrap .search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1rem;
+  color: var(--c-text2);
+}
+.search-input-wrap input { padding-left: 34px; }
+
+.oferta-full {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 10px;
+}
+.oferta-full-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.oferta-full-nombre {
+  font-weight: 700;
+  font-size: .95rem;
+  line-height: 1.3;
+}
+.oferta-full-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.update-info {
+  text-align: center;
+  font-size: .75rem;
+  color: var(--c-text2);
+  padding: 10px;
+  margin-bottom: 8px;
+}
+
+/* ─── Mapa ──────────────────────────────────────────────────────────────────── */
+#map-container {
+  border-radius: var(--radius);
+  overflow: hidden;
+  height: 380px;
+  margin-bottom: 12px;
+  border: 1px solid var(--c-border);
+}
+#map { height: 100%; }
+
+/* ─── Calculadora ───────────────────────────────────────────────────────────── */
+.calc-result {
+  background: linear-gradient(135deg, var(--c-surface2) 0%, var(--c-surface) 100%);
+  border: 2px solid var(--c-accent);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-top: 14px;
+}
+.calc-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--c-border);
+}
+.calc-row:last-child { border-bottom: none; }
+.calc-label { font-size: .85rem; color: var(--c-text2); }
+.calc-value { font-weight: 700; font-size: .95rem; }
+.calc-value.big { font-size: 1.3rem; color: var(--c-accent); }
+.calc-value.green { color: var(--c-green); }
+
+/* ─── Lista de compras ──────────────────────────────────────────────────────── */
+.lista-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+.lista-item-info { flex: 1; min-width: 0; }
+.lista-item-nombre { font-weight: 600; font-size: .9rem; }
+.lista-item-detalle { font-size: .78rem; color: var(--c-text2); }
+.lista-check {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--c-border);
+  background: none;
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .2s;
+  flex-shrink: 0;
+}
+.lista-check.done { background: var(--c-green); border-color: var(--c-green); color: #fff; }
+.lista-del {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: var(--c-text2);
+  padding: 4px;
+}
+
+.lista-totales {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.totales-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+.total-box {
+  background: var(--c-surface2);
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+}
+.total-box-label { font-size: .7rem; color: var(--c-text2); text-transform: uppercase; letter-spacing: .05em; }
+.total-box-value { font-size: 1.1rem; font-weight: 800; margin-top: 4px; }
+.total-box-value.green { color: var(--c-green); }
+
+/* ─── Comparador ────────────────────────────────────────────────────────────── */
+.comp-item {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 10px;
+}
+.comp-winner {
+  border-color: var(--c-green);
+  background: rgba(34,197,94,.04);
+}
+.comp-winner-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: .75rem;
+  font-weight: 700;
+  color: var(--c-green);
+  margin-bottom: 6px;
+}
+
+/* ─── Histórico ─────────────────────────────────────────────────────────────── */
+.hist-item {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.hist-info { flex: 1; }
+.hist-lugar { font-weight: 600; font-size: .9rem; }
+.hist-fecha { font-size: .75rem; color: var(--c-text2); }
+.hist-montos { text-align: right; }
+.hist-total { font-weight: 700; font-size: .95rem; }
+.hist-ahorro { font-size: .78rem; color: var(--c-green); }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.stat-box {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  padding: 14px;
+  text-align: center;
+}
+.stat-label { font-size: .7rem; color: var(--c-text2); text-transform: uppercase; letter-spacing: .05em; }
+.stat-value { font-size: 1.2rem; font-weight: 800; margin-top: 6px; }
+.stat-value.green { color: var(--c-green); }
+.stat-value.orange { color: var(--c-accent); }
+
+/* ─── SVG Chart ─────────────────────────────────────────────────────────────── */
+.chart-wrap {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.chart-wrap svg { width: 100%; height: 120px; }
+
+/* ─── Config ────────────────────────────────────────────────────────────────── */
+.config-section {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.config-section h3 {
+  font-size: .85rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: var(--c-text2);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.config-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--c-border);
+}
+.config-row:last-child { border-bottom: none; }
+.config-label { font-size: .9rem; font-weight: 500; }
+.config-sub { font-size: .75rem; color: var(--c-text2); }
+.toggle {
+  width: 44px; height: 24px;
+  background: var(--c-border);
+  border-radius: 12px;
+  position: relative;
+  cursor: pointer;
+  border: none;
+  transition: background .3s;
+  flex-shrink: 0;
+}
+.toggle::after {
+  content: '';
+  position: absolute;
+  width: 18px; height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  top: 3px; left: 3px;
+  transition: transform .3s;
+}
+.toggle.on { background: var(--c-accent); }
+.toggle.on::after { transform: translateX(20px); }
+
+/* ─── Medios de Pago ────────────────────────────────────────────────────────── */
+.medio-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--c-surface2);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color .2s;
+}
+.medio-item.selected { border-color: var(--c-accent); }
+.medio-icon { font-size: 1.6rem; }
+.medio-info { flex: 1; }
+.medio-nombre { font-weight: 600; font-size: .9rem; }
+.medio-tipo { font-size: .75rem; color: var(--c-text2); }
+.medio-check {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--c-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .9rem;
+  flex-shrink: 0;
+}
+.medio-item.selected .medio-check {
+  background: var(--c-accent);
+  border-color: var(--c-accent);
+  color: #fff;
+}
+
+/* ─── Toast ─────────────────────────────────────────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #1e2a3a;
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 25px;
+  font-size: .88rem;
+  font-weight: 600;
+  opacity: 0;
+  transition: all .3s;
+  z-index: 9999;
+  white-space: nowrap;
+  box-shadow: var(--shadow);
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ─── Utils ──────────────────────────────────────────────────────────────────── */
+.mt-2 { margin-top: 8px; }
+.mt-3 { margin-top: 12px; }
+.flex { display: flex; }
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+.gap-2 { gap: 8px; }
+.text-sm { font-size: .8rem; }
+.text-muted { color: var(--c-text2); }
+.fw-bold { font-weight: 700; }
+.text-green { color: var(--c-green); }
+.text-accent { color: var(--c-accent); }
+.full-btn { width: 100%; }
+.text-center { text-align: center; }
+.divider { border: none; border-top: 1px solid var(--c-border); margin: 12px 0; }
+
+@media (min-width: 500px) {
+  #pages { max-width: 480px; margin: 0 auto; }
+  #header { max-width: 480px; margin: 0 auto; }
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- ─── Header ─── -->
+  <div id="header">
+    <h1>🛒 SuperAhorro</h1>
+    <div id="header-actions">
+      <span id="update-dot" class="text-sm text-muted" style="font-size:.75rem"></span>
+      <button class="icon-btn" onclick="toggleTheme()" id="theme-btn" title="Cambiar tema">🌙</button>
+    </div>
+  </div>
+
+  <!-- ─── Pages ─── -->
+  <div id="pages">
+
+    <!-- PAGE 0: DASHBOARD -->
+    <div class="page active" id="page-0">
+      <div id="alert-container"></div>
+      <div class="card">
+        <div class="card-title">📅 Hoy es</div>
+        <div id="dia-hoy-card"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">💳 Mejores descuentos hoy con mis medios</div>
+        <div id="bancos-hoy"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🔥 Top ofertas de hoy</div>
+        <div id="top-ofertas"></div>
+        <button class="btn btn-secondary full-btn mt-2 btn-sm" onclick="navTo(1)">Ver todas las ofertas →</button>
+      </div>
+    </div>
+
+    <!-- PAGE 1: OFERTAS -->
+    <div class="page" id="page-1">
+      <div id="update-info-ofertas" class="update-info"></div>
+      <div class="filter-bar">
+        <div class="search-input-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="search-oferta" placeholder="Buscar producto..." oninput="renderOfertas()">
+        </div>
+        <div class="pill-row" id="filter-supers"></div>
+        <div class="flex-between gap-2 mt-2">
+          <div style="flex:1">
+            <select id="filter-cat" onchange="renderOfertas()" style="font-size:.8rem">
+              <option value="">Todas las categorías</option>
+              <option value="almacen">Almacén</option>
+              <option value="lacteos">Lácteos</option>
+              <option value="carnes">Carnes</option>
+              <option value="bebidas">Bebidas</option>
+              <option value="limpieza">Limpieza</option>
+              <option value="fiambre">Fiambres</option>
+              <option value="panaderia">Panadería</option>
+              <option value="higiene">Higiene</option>
+              <option value="congelados">Congelados</option>
+              <option value="frutas_verduras">Frutas/Verduras</option>
+              <option value="mayorista">Mayorista</option>
+            </select>
+          </div>
+          <div style="flex:1">
+            <select id="filter-desc" onchange="renderOfertas()" style="font-size:.8rem">
+              <option value="0">Cualquier descuento</option>
+              <option value="10">+10% off</option>
+              <option value="20">+20% off</option>
+              <option value="30">+30% off</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div id="ofertas-list"></div>
+    </div>
+
+    <!-- PAGE 2: MEDIOS DE PAGO -->
+    <div class="page" id="page-2">
+      <div class="card">
+        <div class="card-title">💳 Mis medios de pago</div>
+        <p class="text-sm text-muted" style="margin-bottom:12px">Tildá los que tenés para filtrar las mejores promo.</p>
+        <div id="medios-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 Mis bancos activos</div>
+        <div id="medios-resumen"></div>
+      </div>
+    </div>
+
+    <!-- PAGE 3: MAPA -->
+    <div class="page" id="page-3">
+      <div class="pill-row" id="mapa-filtro"></div>
+      <div id="map-container"><div id="map"></div></div>
+      <div id="sucursales-list-cercanas">
+        <div class="card-title" style="margin-bottom:8px">📍 Todas las sucursales</div>
+        <div id="sucursales-cards"></div>
+      </div>
+    </div>
+
+    <!-- PAGE 4: CALCULADORA -->
+    <div class="page" id="page-4">
+      <div class="card">
+        <div class="card-title">💰 Calculadora de ahorro</div>
+        <div class="input-row">
+          <label style="font-size:.85rem;white-space:nowrap">Monto $</label>
+          <input type="number" id="calc-monto" placeholder="ej: 15000" oninput="calcular()" min="0">
+        </div>
+        <div class="input-row">
+          <label style="font-size:.85rem;white-space:nowrap">Medio</label>
+          <select id="calc-medio" onchange="calcular()" style="font-size:.85rem">
+            <option value="">Seleccioná...</option>
+          </select>
+        </div>
+        <div class="input-row">
+          <label style="font-size:.85rem;white-space:nowrap">Super</label>
+          <select id="calc-super" onchange="calcular()" style="font-size:.85rem">
+            <option value="">Cualquiera</option>
+            <option>Carrefour</option><option>Día</option><option>Coto</option>
+            <option>Changomas</option><option>Jumbo</option><option>Vea</option>
+            <option>Disco</option><option>Maxiconsumo</option><option>Diarco</option>
+          </select>
+        </div>
+        <div class="input-row">
+          <label style="font-size:.85rem;white-space:nowrap">Día</label>
+          <select id="calc-dia" onchange="calcular()" style="font-size:.85rem">
+            <option value="">Hoy</option>
+            <option value="lunes">Lunes</option><option value="martes">Martes</option>
+            <option value="miercoles">Miércoles</option><option value="jueves">Jueves</option>
+            <option value="viernes">Viernes</option><option value="sabado">Sábado</option>
+            <option value="domingo">Domingo</option>
+          </select>
+        </div>
+        <div id="calc-resultado"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 ¿Y si compro mañana?</div>
+        <div id="calc-manana"></div>
+      </div>
+    </div>
+
+    <!-- PAGE 5: LISTA -->
+    <div class="page" id="page-5">
+      <div class="lista-totales">
+        <div class="card-title">🛒 Mi lista de compras</div>
+        <div class="totales-grid">
+          <div class="total-box">
+            <div class="total-box-label">Items</div>
+            <div class="total-box-value" id="lista-count">0</div>
+          </div>
+          <div class="total-box">
+            <div class="total-box-label">Ahorro estimado</div>
+            <div class="total-box-value green" id="lista-ahorro">$0</div>
+          </div>
+        </div>
+      </div>
+      <div class="card" id="lista-recomendacion" style="display:none">
+        <div class="card-title">💡 Recomendación</div>
+        <div id="lista-rec-content"></div>
+      </div>
+      <div class="input-row">
+        <input type="text" id="lista-input" placeholder="Agregar producto..." onkeydown="if(event.key==='Enter')addToLista()">
+        <button class="btn btn-primary" onclick="addToLista()">+</button>
+      </div>
+      <div id="lista-items"></div>
+    </div>
+
+    <!-- PAGE 6: COMPARADOR -->
+    <div class="page" id="page-6">
+      <div class="card">
+        <div class="card-title">⚖️ Comparador rápido</div>
+        <input type="text" id="comp-producto" placeholder="Nombre del producto" style="margin-bottom:10px">
+        <div id="comp-supers">
+          <div class="comp-super-row" data-idx="0">
+            <div class="flex gap-2">
+              <select class="comp-super-sel" style="flex:1;font-size:.85rem">
+                <option value="">Súper...</option>
+                <option>Carrefour</option><option>Día</option><option>Coto</option>
+                <option>Changomas</option><option>Jumbo</option><option>Vea</option>
+              </select>
+              <input type="number" class="comp-precio-inp" placeholder="Precio $" min="0" style="width:110px;font-size:.85rem">
+            </div>
+          </div>
+          <div class="comp-super-row mt-2" data-idx="1">
+            <div class="flex gap-2">
+              <select class="comp-super-sel" style="flex:1;font-size:.85rem">
+                <option value="">Súper...</option>
+                <option>Carrefour</option><option>Día</option><option>Coto</option>
+                <option>Changomas</option><option>Jumbo</option><option>Vea</option>
+              </select>
+              <input type="number" class="comp-precio-inp" placeholder="Precio $" min="0" style="width:110px;font-size:.85rem">
+            </div>
+          </div>
+          <div class="comp-super-row mt-2" data-idx="2">
+            <div class="flex gap-2">
+              <select class="comp-super-sel" style="flex:1;font-size:.85rem">
+                <option value="">Súper...</option>
+                <option>Carrefour</option><option>Día</option><option>Coto</option>
+                <option>Changomas</option><option>Jumbo</option><option>Vea</option>
+              </select>
+              <input type="number" class="comp-precio-inp" placeholder="Precio $" min="0" style="width:110px;font-size:.85rem">
+            </div>
+          </div>
+        </div>
+        <div class="flex gap-2 mt-3">
+          <button class="btn btn-primary" style="flex:1" onclick="comparar()">Comparar</button>
+          <button class="btn btn-secondary" onclick="buscarPreciosClaros()">Precios Claros</button>
+        </div>
+        <div id="comp-resultado"></div>
+      </div>
+    </div>
+
+    <!-- PAGE 7: HISTÓRICO -->
+    <div class="page" id="page-7">
+      <div class="stats-grid" id="hist-stats"></div>
+      <div class="chart-wrap">
+        <div class="card-title">📈 Ahorro acumulado</div>
+        <svg id="chart-svg" viewBox="0 0 300 100" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="card">
+        <div class="card-title flex-between">
+          Registrar compra
+          <button class="btn btn-primary btn-sm" onclick="toggleRegistro()">+ Nueva</button>
+        </div>
+        <div id="registro-form" style="display:none; margin-top:10px">
+          <div class="input-row"><input type="text" id="reg-lugar" placeholder="Supermercado"></div>
+          <div class="input-row"><input type="number" id="reg-monto" placeholder="Monto total $"></div>
+          <div class="input-row"><input type="number" id="reg-ahorro" placeholder="Ahorro $ (opcional)"></div>
+          <div class="input-row">
+            <select id="reg-medio" style="font-size:.85rem">
+              <option value="">Medio de pago...</option>
+            </select>
+          </div>
+          <button class="btn btn-primary full-btn mt-2" onclick="registrarCompra()">Guardar compra</button>
+        </div>
+      </div>
+      <div class="card-title" style="margin: 8px 0">🧾 Compras registradas</div>
+      <div id="hist-list"></div>
+    </div>
+
+    <!-- PAGE 8: CONFIGURACIÓN -->
+    <div class="page" id="page-8">
+      <div class="config-section">
+        <h3>🎨 Apariencia</h3>
+        <div class="config-row">
+          <div>
+            <div class="config-label">Modo oscuro</div>
+          </div>
+          <button class="toggle" id="dark-toggle" onclick="toggleTheme()"></button>
+        </div>
+      </div>
+      <div class="config-section">
+        <h3>📡 Datos</h3>
+        <div class="config-row">
+          <div>
+            <div class="config-label">Última actualización</div>
+            <div class="config-sub" id="config-ultima-act">–</div>
+          </div>
+        </div>
+        <div class="config-row">
+          <div>
+            <div class="config-label">Forzar actualización</div>
+            <div class="config-sub">Re-descarga las ofertas del día</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="forceRefresh()">↻ Actualizar</button>
+        </div>
+      </div>
+      <div class="config-section">
+        <h3>✏️ Descuentos bancarios</h3>
+        <p class="text-sm text-muted" style="margin-bottom:10px">Editá el archivo <code>data/descuentos_bancos.json</code> en GitHub para actualizarlos.</p>
+        <div id="config-bancos-lista"></div>
+      </div>
+      <div class="config-section">
+        <h3>⚠️ Aviso importante</h3>
+        <p class="text-sm text-muted" style="line-height:1.6">
+          Las ofertas son obtenidas automáticamente de sitios públicos. <strong>Verificá disponibilidad y precio en la sucursal antes de viajar.</strong> Los precios pueden variar según sucursal o stock.
+        </p>
+      </div>
+      <div class="config-section">
+        <h3>🗑️ Datos</h3>
+        <button class="btn btn-secondary full-btn" onclick="confirmarBorrar()">Borrar historial de compras</button>
+      </div>
+    </div>
+
+  </div><!-- /pages -->
+
+  <!-- ─── Navbar ─── -->
+  <nav id="nav">
+    <button class="nav-btn active" onclick="navTo(0)">
+      <span class="nav-icon">🏠</span>Inicio
+    </button>
+    <button class="nav-btn" onclick="navTo(1)">
+      <span class="nav-icon">🏷️</span>Ofertas
+    </button>
+    <button class="nav-btn" onclick="navTo(3)">
+      <span class="nav-icon">🗺️</span>Mapa
+    </button>
+    <button class="nav-btn" onclick="navTo(5)">
+      <span class="nav-icon">📝</span>Lista
+    </button>
+    <button class="nav-btn" onclick="navTo(8)">
+      <span class="nav-icon">⚙️</span>Config
+    </button>
+  </nav>
+</div>
+
+<div id="toast"></div>
+
+<!-- Modal de página extra -->
+<div id="extra-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:1000; align-items:flex-end; justify-content:center">
+  <div style="background:var(--c-surface); border-radius:20px 20px 0 0; padding:20px; width:100%; max-height:85vh; overflow-y:auto">
+    <div class="flex-between" style="margin-bottom:14px">
+      <strong id="extra-title"></strong>
+      <button onclick="closeExtra()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--c-text)">✕</button>
+    </div>
+    <div id="extra-content"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ═══════════════════════════════════════════════════
+// ESTADO GLOBAL
+// ═══════════════════════════════════════════════════
+const STATE = {
+  ofertas: [],
+  bancos: [],
+  sucursales: [],
+  mediosSeleccionados: [],
+  lista: [],
+  historial: [],
+  theme: 'dark',
+  filtroSuper: '',
+  pagina: 0,
+  map: null,
+  mapInitialized: false,
+};
+
+// Días en español
+const DIAS = ['domingo','lunes','martes','miercoles','jueves','viernes','sabado'];
+const DIAS_NOMBRES = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+const HOY_IDX = new Date().getDay();
+const HOY = DIAS[HOY_IDX];
+const HOY_NOMBRE = DIAS_NOMBRES[HOY_IDX];
+
+// ═══════════════════════════════════════════════════
+// LOCAL STORAGE
+// ═══════════════════════════════════════════════════
+function lsGet(k, def) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch { return def; } }
+function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+
+function loadLocal() {
+  STATE.mediosSeleccionados = lsGet('medios', []);
+  STATE.lista = lsGet('lista', []);
+  STATE.historial = lsGet('historial', []);
+  STATE.theme = lsGet('theme', 'dark');
+}
+function saveLocal() {
+  lsSet('medios', STATE.mediosSeleccionados);
+  lsSet('lista', STATE.lista);
+  lsSet('historial', STATE.historial);
+  lsSet('theme', STATE.theme);
+}
+
+// ═══════════════════════════════════════════════════
+// FETCH DE DATOS
+// ═══════════════════════════════════════════════════
+async function fetchJSON(url) {
+  const r = await fetch(url + '?_=' + Date.now());
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
+async function loadData() {
+  try {
+    const [oData, bData, sData] = await Promise.all([
+      fetchJSON('data/ofertas.json'),
+      fetchJSON('data/descuentos_bancos.json'),
+      fetchJSON('data/sucursales.json'),
+    ]);
+    STATE.ofertas = oData.ofertas || [];
+    STATE.bancos = bData.descuentos || [];
+    STATE.sucursales = sData.sucursales || [];
+
+    const meta = oData.meta || {};
+    lsSet('ultima_act', meta.ultima_actualizacion || '');
+    actualizarHeaderFecha(meta.ultima_actualizacion);
+  } catch (e) {
+    console.warn('Error cargando datos:', e);
+    showToast('⚠️ Error al cargar datos. Usando caché.');
+  }
+}
+
+function actualizarHeaderFecha(fechaStr) {
+  if (!fechaStr) return;
+  const d = new Date(fechaStr);
+  const diff = Math.round((Date.now() - d.getTime()) / 3600000);
+  const txt = diff < 1 ? 'hace menos de 1h' : diff < 24 ? `hace ${diff}h` : `hace ${Math.round(diff/24)}d`;
+  document.getElementById('update-dot').textContent = txt;
+  const el = document.getElementById('update-info-ofertas');
+  if (el) el.textContent = `Actualizado ${txt} • ${STATE.ofertas.length} ofertas`;
+  const conf = document.getElementById('config-ultima-act');
+  if (conf) conf.textContent = d.toLocaleString('es-AR');
+}
+
+// ═══════════════════════════════════════════════════
+// NAVEGACIÓN
+// ═══════════════════════════════════════════════════
+function navTo(idx) {
+  document.querySelectorAll('.page').forEach((p,i) => p.classList.toggle('active', i === idx));
+  document.querySelectorAll('.nav-btn').forEach((b,i) => b.classList.toggle('active', i === idx));
+
+  // Ajustar nav index: 0→0, 1→1, 2→3, 3→5, 4→8
+  const navMap = [0,1,3,5,8];
+  document.querySelectorAll('.nav-btn').forEach((b,i) => b.classList.toggle('active', navMap[i] === idx));
+
+  STATE.pagina = idx;
+  if (idx === 3 && !STATE.mapInitialized) initMap();
+  if (idx === 0) renderDashboard();
+  if (idx === 1) renderOfertas();
+  if (idx === 2) renderMedios();
+  if (idx === 4) renderCalcOpciones();
+  if (idx === 5) renderLista();
+  if (idx === 7) renderHistorico();
+  if (idx === 8) renderConfig();
+  document.getElementById('pages').scrollTop = 0;
+}
+
+// ═══════════════════════════════════════════════════
+// THEME
+// ═══════════════════════════════════════════════════
+function toggleTheme() {
+  STATE.theme = STATE.theme === 'dark' ? 'light' : 'dark';
+  applyTheme();
+  saveLocal();
+}
+function applyTheme() {
+  document.body.classList.toggle('light', STATE.theme === 'light');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = STATE.theme === 'dark' ? '☀️' : '🌙';
+  const tog = document.getElementById('dark-toggle');
+  if (tog) tog.classList.toggle('on', STATE.theme === 'dark');
+}
+
+// ═══════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ═══════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════
+function renderDashboard() {
+  renderDiaHoy();
+  renderAlerta();
+  renderBancosHoy();
+  renderTopOfertas();
+}
+
+function renderDiaHoy() {
+  const el = document.getElementById('dia-hoy-card');
+  el.innerHTML = `
+    <div class="dia-hoy">
+      <div class="dia-circle">
+        <span>${HOY_NOMBRE.slice(0,2).toUpperCase()}</span>
+        ${new Date().getDate()}/${new Date().getMonth()+1}
+      </div>
+      <div>
+        <div style="font-size:1.1rem;font-weight:800">${HOY_NOMBRE}</div>
+        <div class="text-sm text-muted">${getBancosBeneficios().length} descuentos activos hoy</div>
+      </div>
+    </div>`;
+}
+
+function getBancosBeneficios(dia = HOY) {
+  const medios = STATE.mediosSeleccionados;
+  return STATE.bancos
+    .filter(b => {
+      if (medios.length && !medios.includes(b.id)) return false;
+      return b.beneficios.some(ben => ben.dia_semana === dia && ben.activo);
+    })
+    .map(b => ({ ...b, beneficio: b.beneficios.find(ben => ben.dia_semana === dia && ben.activo) }))
+    .filter(b => b.beneficio)
+    .sort((a,b) => b.beneficio.descuento_pct - a.beneficio.descuento_pct);
+}
+
+function renderAlerta() {
+  const el = document.getElementById('alert-container');
+  const beneficios = getBancosBeneficios();
+  if (!beneficios.length) { el.innerHTML = ''; return; }
+  const top = beneficios[0];
+  const supers = top.beneficio.supermercados.slice(0,3).join(', ');
+  el.innerHTML = `
+    <div class="alert-banner">
+      <h2>🔥 Hoy ${HOY_NOMBRE.toUpperCase()}</h2>
+      <p>${top.icono} ${top.entidad}: <strong>${top.beneficio.descuento_pct}% off</strong> en ${supers}${top.beneficio.tope_reintegro ? ` (hasta $${top.beneficio.tope_reintegro} de reintegro)` : ''}</p>
+    </div>`;
+}
+
+function renderBancosHoy() {
+  const el = document.getElementById('bancos-hoy');
+  const beneficios = getBancosBeneficios();
+  if (!beneficios.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">💳</div><p>No hay descuentos para tus medios de pago hoy.<br>Configurá tus medios en la pestaña "Config".</p></div>`;
+    return;
+  }
+  el.innerHTML = beneficios.slice(0,3).map(b => `
+    <div class="banco-card">
+      <div class="banco-icon">${b.icono}</div>
+      <div class="banco-info">
+        <div class="banco-nombre">${b.entidad}</div>
+        <div class="banco-detalle">${b.beneficio.supermercados.slice(0,2).join(', ')} • ${b.beneficio.condicion}</div>
+      </div>
+      <div class="banco-pct">${b.beneficio.descuento_pct}%</div>
+    </div>`).join('');
+}
+
+function renderTopOfertas() {
+  const el = document.getElementById('top-ofertas');
+  const supersSel = STATE.mediosSeleccionados.length ? null : null; // Sin filtro de super en dashboard
+  const top = STATE.ofertas
+    .filter(o => o.descuento_pct)
+    .sort((a,b) => b.descuento_pct - a.descuento_pct)
+    .slice(0,10);
+
+  if (!top.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🏷️</div><p>No hay ofertas cargadas todavía.<br>El scraper corre todos los días a las 7am.</p></div>`;
+    return;
+  }
+  el.innerHTML = top.map(o => ofertaItemHTML(o, true)).join('');
+}
+
+function ofertaItemHTML(o, compact=false) {
+  const emoji = categoriaEmoji(o.categoria);
+  return `
+    <div class="oferta-item" onclick="${o.url_fuente ? `abrirLink('${o.url_fuente}')` : ''}">
+      <div class="oferta-img">${emoji}</div>
+      <div class="oferta-info">
+        <div class="oferta-nombre">${o.producto}</div>
+        <div class="oferta-super">${o.supermercado}${o.sucursal ? ' · '+o.sucursal : ''}</div>
+        ${!compact ? `<span class="badge badge-blue">${o.categoria || 'general'}</span>` : ''}
+      </div>
+      <div class="oferta-precios">
+        <div class="oferta-precio">$${fmt(o.precio)}</div>
+        ${o.precio_anterior ? `<div class="oferta-anterior">$${fmt(o.precio_anterior)}</div>` : ''}
+        ${o.descuento_pct ? `<div class="oferta-descuento">-${o.descuento_pct}%</div>` : ''}
+      </div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+// OFERTAS
+// ═══════════════════════════════════════════════════
+function renderOfertas() {
+  const search = (document.getElementById('search-oferta')?.value || '').toLowerCase();
+  const cat = document.getElementById('filter-cat')?.value || '';
+  const descMin = parseInt(document.getElementById('filter-desc')?.value || '0');
+  const superFiltro = STATE.filtroSuper;
+
+  let lista = STATE.ofertas;
+  if (search) lista = lista.filter(o => o.producto.toLowerCase().includes(search));
+  if (cat) lista = lista.filter(o => o.categoria === cat);
+  if (descMin) lista = lista.filter(o => (o.descuento_pct || 0) >= descMin);
+  if (superFiltro) lista = lista.filter(o => o.supermercado === superFiltro);
+
+  lista = lista.sort((a,b) => (b.descuento_pct || 0) - (a.descuento_pct || 0));
+
+  // Render filtros de supers
+  renderFiltroSupers();
+
+  const el = document.getElementById('ofertas-list');
+  if (!lista.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div><p>Sin ofertas con ese filtro.</p></div>`;
+    return;
+  }
+
+  el.innerHTML = lista.map(o => `
+    <div class="oferta-full">
+      <div class="oferta-full-header">
+        <div>
+          <span class="badge badge-blue" style="margin-bottom:4px">${o.categoria || 'general'}</span>
+          <div class="oferta-full-nombre">${o.producto}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:1.2rem;font-weight:900;color:var(--c-accent)">$${fmt(o.precio)}</div>
+          ${o.precio_anterior ? `<div class="text-sm text-muted" style="text-decoration:line-through">$${fmt(o.precio_anterior)}</div>` : ''}
+          ${o.descuento_pct ? `<span class="badge badge-green">-${o.descuento_pct}%</span>` : ''}
+        </div>
+      </div>
+      <div class="oferta-full-footer">
+        <div>
+          <span class="badge badge-orange">${o.supermercado}</span>
+          ${o.fecha_vencimiento ? `<span class="text-sm text-muted" style="margin-left:6px">hasta ${o.fecha_vencimiento}</span>` : ''}
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-secondary btn-sm" onclick="addOfertaLista(${JSON.stringify(o).replace(/"/g,'&quot;')})">+ Lista</button>
+          ${o.url_fuente ? `<button class="btn btn-secondary btn-sm" onclick="abrirLink('${o.url_fuente}')">Ver →</button>` : ''}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function renderFiltroSupers() {
+  const el = document.getElementById('filter-supers');
+  if (!el) return;
+  const supers = [...new Set(STATE.ofertas.map(o => o.supermercado))].sort();
+  el.innerHTML = `<span class="pill ${!STATE.filtroSuper ? 'active' : ''}" onclick="setFiltroSuper('')">Todos</span>` +
+    supers.map(s => `<span class="pill ${STATE.filtroSuper === s ? 'active' : ''}" onclick="setFiltroSuper('${s}')">${s}</span>`).join('');
+}
+
+function setFiltroSuper(s) {
+  STATE.filtroSuper = s;
+  renderOfertas();
+}
+
+function addOfertaLista(o) {
+  STATE.lista.push({ id: Date.now(), nombre: o.producto, precio: o.precio, super: o.supermercado, done: false });
+  saveLocal();
+  showToast(`✅ "${o.producto.slice(0,25)}" agregado a la lista`);
+}
+
+// ═══════════════════════════════════════════════════
+// MEDIOS DE PAGO
+// ═══════════════════════════════════════════════════
+function renderMedios() {
+  const el = document.getElementById('medios-list');
+  if (!el) return;
+  el.innerHTML = STATE.bancos.map(b => `
+    <div class="medio-item ${STATE.mediosSeleccionados.includes(b.id) ? 'selected' : ''}" onclick="toggleMedio('${b.id}')">
+      <div class="medio-icon">${b.icono}</div>
+      <div class="medio-info">
+        <div class="medio-nombre">${b.entidad}</div>
+        <div class="medio-tipo">${b.tipo === 'banco' ? 'Banco' : 'Billetera'}</div>
+      </div>
+      <div class="medio-check">${STATE.mediosSeleccionados.includes(b.id) ? '✓' : ''}</div>
+    </div>`).join('');
+
+  const resumen = document.getElementById('medios-resumen');
+  if (resumen) {
+    const sel = STATE.bancos.filter(b => STATE.mediosSeleccionados.includes(b.id));
+    resumen.innerHTML = sel.length
+      ? sel.map(b => `<span class="badge badge-orange" style="margin:2px">${b.icono} ${b.entidad}</span>`).join(' ')
+      : `<p class="text-sm text-muted">Seleccioná arriba los medios que tenés.</p>`;
+  }
+}
+
+function toggleMedio(id) {
+  const idx = STATE.mediosSeleccionados.indexOf(id);
+  if (idx >= 0) STATE.mediosSeleccionados.splice(idx, 1);
+  else STATE.mediosSeleccionados.push(id);
+  saveLocal();
+  renderMedios();
+}
+
+// ═══════════════════════════════════════════════════
+// MAPA
+// ═══════════════════════════════════════════════════
+function initMap() {
+  if (STATE.mapInitialized) return;
+  STATE.mapInitialized = true;
+
+  const map = L.map('map', { zoomControl: true }).setView([-34.5200, -58.7600], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap',
+    maxZoom: 18,
+  }).addTo(map);
+  STATE.map = map;
+  renderMapMarcadores();
+  renderSucursalesCards();
+  renderMapaFiltro();
+}
+
+const CADENA_COLORES = {
+  'Carrefour': '#0052cc', 'Día': '#e31e1e', 'Coto': '#f5a623',
+  'Changomas': '#2e7d32', 'Jumbo': '#1565c0', 'Vea': '#00695c',
+  'Disco': '#6a1b9a', 'Maxiconsumo': '#5d4037', 'Diarco': '#4a148c',
+};
+
+function getMarkerIcon(cadena) {
+  const color = CADENA_COLORES[cadena] || '#555';
+  const svg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="36"><circle cx="14" cy="14" r="12" fill="${color}" stroke="#fff" stroke-width="2"/><rect x="6" y="12" width="16" height="10" fill="#fff" rx="2"/><path d="M9 12V9a5 5 0 0110 0v3" fill="none" stroke="#fff" stroke-width="2"/></svg>`);
+  return L.icon({ iconUrl: `data:image/svg+xml,${svg}`, iconSize: [28,36], iconAnchor: [14,36], popupAnchor: [0,-36] });
+}
+
+let mapaFiltro = '';
+function renderMapMarcadores() {
+  if (!STATE.map) return;
+  STATE.map.eachLayer(l => { if (l instanceof L.Marker) STATE.map.removeLayer(l); });
+  const suc = mapaFiltro ? STATE.sucursales.filter(s => s.cadena === mapaFiltro) : STATE.sucursales;
+  suc.forEach(s => {
+    const m = L.marker([s.lat, s.lng], { icon: getMarkerIcon(s.cadena) }).addTo(STATE.map);
+    const gmaps = `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}`;
+    m.bindPopup(`<strong>${s.nombre}</strong><br>${s.direccion}<br><small>${s.horario || ''}</small><br><a href="${gmaps}" target="_blank" style="color:#e8651a">📍 Cómo llegar</a>`);
+  });
+}
+
+function renderMapaFiltro() {
+  const el = document.getElementById('mapa-filtro');
+  if (!el) return;
+  const cadenas = [...new Set(STATE.sucursales.map(s => s.cadena))].sort();
+  el.innerHTML = `<span class="pill ${!mapaFiltro ? 'active' : ''}" onclick="setMapaFiltro('')">Todos</span>` +
+    cadenas.map(c => `<span class="pill ${mapaFiltro === c ? 'active' : ''}" onclick="setMapaFiltro('${c}')">${c}</span>`).join('');
+}
+
+function setMapaFiltro(c) {
+  mapaFiltro = c;
+  renderMapMarcadores();
+  renderMapaFiltro();
+  renderSucursalesCards();
+}
+
+function renderSucursalesCards() {
+  const el = document.getElementById('sucursales-cards');
+  if (!el) return;
+  const suc = mapaFiltro ? STATE.sucursales.filter(s => s.cadena === mapaFiltro) : STATE.sucursales;
+  el.innerHTML = suc.map(s => {
+    const gmaps = `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}`;
+    return `
+      <div class="card" style="padding:12px;margin-bottom:8px">
+        <div class="flex-between">
+          <div>
+            <div style="font-weight:700">${s.nombre}</div>
+            <div class="text-sm text-muted">${s.direccion}</div>
+            <div class="text-sm text-muted">${s.horario || ''}</div>
+          </div>
+          <a href="${gmaps}" target="_blank" class="btn btn-secondary btn-sm" onclick="event.stopPropagation()">📍 IR</a>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// CALCULADORA
+// ═══════════════════════════════════════════════════
+function renderCalcOpciones() {
+  const sel = document.getElementById('calc-medio');
+  if (!sel || sel.options.length > 1) return;
+  STATE.bancos.forEach(b => {
+    const opt = document.createElement('option');
+    opt.value = b.id;
+    opt.textContent = `${b.icono} ${b.entidad}`;
+    sel.appendChild(opt);
+  });
+}
+
+function calcular() {
+  const monto = parseFloat(document.getElementById('calc-monto').value) || 0;
+  const medioId = document.getElementById('calc-medio').value;
+  const superSel = document.getElementById('calc-super').value;
+  let dia = document.getElementById('calc-dia').value || HOY;
+
+  const el = document.getElementById('calc-resultado');
+  const elManana = document.getElementById('calc-manana');
+
+  if (!monto || !medioId) {
+    el.innerHTML = ''; elManana.innerHTML = '';
+    return;
+  }
+
+  const banco = STATE.bancos.find(b => b.id === medioId);
+  if (!banco) return;
+
+  const beneficio = banco.beneficios.find(b =>
+    b.dia_semana === dia && b.activo &&
+    (!superSel || b.supermercados.includes(superSel))
+  );
+
+  let html = `<div class="calc-result">`;
+  if (beneficio) {
+    const descPct = beneficio.descuento_pct;
+    const ahorro = Math.min(monto * descPct / 100, beneficio.tope_reintegro || Infinity);
+    const final = monto - ahorro;
+    html += `
+      <div class="calc-row"><span class="calc-label">Precio de lista</span><span class="calc-value">$${fmt(monto)}</span></div>
+      <div class="calc-row"><span class="calc-label">Descuento (${descPct}%)</span><span class="calc-value green">-$${fmt(ahorro)}</span></div>
+      ${beneficio.tope_reintegro ? `<div class="calc-row"><span class="calc-label">Tope reintegro</span><span class="calc-value">$${fmt(beneficio.tope_reintegro)}</span></div>` : ''}
+      <div class="calc-row"><span class="calc-label">💰 Pagás</span><span class="calc-value big">$${fmt(final)}</span></div>
+      <div class="calc-row"><span class="calc-label">Ahorrás</span><span class="calc-value green">$${fmt(ahorro)} (${descPct}%)</span></div>`;
+  } else {
+    html += `<p class="text-sm text-muted">No hay beneficio con ${banco.entidad} el ${DIAS_NOMBRES[DIAS.indexOf(dia)]}${superSel ? ' en '+superSel : ''}.</p>`;
+  }
+  html += `</div>`;
+  el.innerHTML = html;
+
+  // Comparar con mañana
+  const mañanaIdx = (DIAS.indexOf(dia) + 1) % 7;
+  const mañana = DIAS[mañanaIdx];
+  const mañanaNombre = DIAS_NOMBRES[mañanaIdx];
+  const benManana = banco.beneficios.find(b =>
+    b.dia_semana === mañana && b.activo &&
+    (!superSel || b.supermercados.includes(superSel))
+  );
+  if (benManana) {
+    const ahorro2 = Math.min(monto * benManana.descuento_pct / 100, benManana.tope_reintegro || Infinity);
+    elManana.innerHTML = `
+      <div class="calc-result">
+        <p class="text-sm text-muted" style="margin-bottom:8px">Si comprás mañana (${mañanaNombre}):</p>
+        <div class="calc-row"><span class="calc-label">Descuento</span><span class="calc-value">${benManana.descuento_pct}%</span></div>
+        <div class="calc-row"><span class="calc-label">Ahorrás</span><span class="calc-value green">$${fmt(ahorro2)}</span></div>
+      </div>`;
+  } else {
+    elManana.innerHTML = `<p class="text-sm text-muted">No hay beneficio con ${banco.entidad} mañana (${mañanaNombre}).</p>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// LISTA DE COMPRAS
+// ═══════════════════════════════════════════════════
+function addToLista() {
+  const inp = document.getElementById('lista-input');
+  const nombre = inp.value.trim();
+  if (!nombre) return;
+  STATE.lista.push({ id: Date.now(), nombre, precio: null, super: null, done: false });
+  inp.value = '';
+  saveLocal();
+  renderLista();
+  generarRecomendacion();
+}
+
+function renderLista() {
+  const el = document.getElementById('lista-items');
+  if (!el) return;
+  if (!STATE.lista.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">📝</div><p>Tu lista está vacía.<br>Agregá productos arriba o desde la pestaña Ofertas.</p></div>`;
+    document.getElementById('lista-count').textContent = '0';
+    document.getElementById('lista-ahorro').textContent = '$0';
+    return;
+  }
+
+  el.innerHTML = STATE.lista.map(item => `
+    <div class="lista-item ${item.done ? 'opacity:0.5' : ''}">
+      <button class="lista-check ${item.done ? 'done' : ''}" onclick="toggleListaItem(${item.id})">${item.done ? '✓' : ''}</button>
+      <div class="lista-item-info">
+        <div class="lista-item-nombre" style="${item.done ? 'text-decoration:line-through;opacity:.5' : ''}">${item.nombre}</div>
+        ${item.super ? `<div class="lista-item-detalle">${item.super}${item.precio ? ' · $'+fmt(item.precio) : ''}</div>` : ''}
+      </div>
+      <button class="lista-del" onclick="delListaItem(${item.id})">🗑️</button>
+    </div>`).join('');
+
+  document.getElementById('lista-count').textContent = STATE.lista.length;
+  generarRecomendacion();
+}
+
+function toggleListaItem(id) {
+  const item = STATE.lista.find(i => i.id === id);
+  if (item) item.done = !item.done;
+  saveLocal(); renderLista();
+}
+
+function delListaItem(id) {
+  STATE.lista = STATE.lista.filter(i => i.id !== id);
+  saveLocal(); renderLista();
+}
+
+function generarRecomendacion() {
+  const rec = document.getElementById('lista-recomendacion');
+  const recContent = document.getElementById('lista-rec-content');
+  if (!rec || !recContent) return;
+
+  const pendientes = STATE.lista.filter(i => !i.done);
+  if (!pendientes.length) { rec.style.display = 'none'; return; }
+
+  const beneficiosHoy = getBancosBeneficios();
+  rec.style.display = 'block';
+
+  let html = '';
+  if (beneficiosHoy.length) {
+    const top = beneficiosHoy[0];
+    const ahorro = pendientes.length * 3000 * top.beneficio.descuento_pct / 100; // estimado
+    html = `<p class="text-sm">💡 <strong>Mejor momento:</strong> Hoy (${HOY_NOMBRE}) con ${top.icono} <strong>${top.entidad}</strong> en ${top.beneficio.supermercados[0]} — <span class="text-green">${top.beneficio.descuento_pct}% off</span></p>`;
+  } else {
+    html = `<p class="text-sm text-muted">Configurá tus medios de pago para ver recomendaciones.</p>`;
+  }
+
+  // Ahorros estimados
+  const ahorroTotal = pendientes.reduce((a, item) => {
+    if (item.precio) {
+      const bestDesc = beneficiosHoy[0]?.beneficio?.descuento_pct || 0;
+      return a + (item.precio * bestDesc / 100);
+    }
+    return a;
+  }, 0);
+
+  document.getElementById('lista-ahorro').textContent = ahorroTotal > 0 ? '$' + fmt(ahorroTotal) : '$0*';
+  recContent.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════
+// COMPARADOR
+// ═══════════════════════════════════════════════════
+function comparar() {
+  const el = document.getElementById('comp-resultado');
+  const rows = document.querySelectorAll('.comp-super-row');
+  const items = [];
+
+  rows.forEach(row => {
+    const super_ = row.querySelector('.comp-super-sel').value;
+    const precio = parseFloat(row.querySelector('.comp-precio-inp').value);
+    if (super_ && precio) items.push({ super: super_, precio });
+  });
+
+  if (items.length < 2) {
+    el.innerHTML = `<p class="text-sm text-muted mt-2">Completá al menos 2 súpers con precio.</p>`;
+    return;
+  }
+
+  // Aplicar descuentos del día
+  const resultado = items.map(item => {
+    const beneficio = STATE.bancos
+      .filter(b => STATE.mediosSeleccionados.includes(b.id))
+      .flatMap(b => b.beneficios.filter(ben => ben.dia_semana === HOY && ben.activo && ben.supermercados.includes(item.super)))
+      .sort((a,b) => b.descuento_pct - a.descuento_pct)[0];
+
+    const descPct = beneficio?.descuento_pct || 0;
+    const ahorro = Math.min(item.precio * descPct / 100, beneficio?.tope_reintegro || Infinity);
+    return { ...item, descPct, ahorro, final: item.precio - ahorro };
+  }).sort((a,b) => a.final - b.final);
+
+  el.innerHTML = `<div style="margin-top:14px">` +
+    resultado.map((r,i) => `
+      <div class="comp-item ${i===0 ? 'comp-winner' : ''}">
+        ${i===0 ? `<div class="comp-winner-badge">✅ Mejor opción</div>` : ''}
+        <div class="flex-between">
+          <strong>${r.super}</strong>
+          <span style="font-size:1.1rem;font-weight:800;color:var(--c-accent)">$${fmt(r.final)}</span>
+        </div>
+        <div class="text-sm text-muted">Lista: $${fmt(r.precio)} ${r.descPct ? `→ -${r.descPct}% con tu medio de pago` : '(sin descuento hoy)'}</div>
+      </div>`).join('') + `</div>`;
+}
+
+function buscarPreciosClaros() {
+  const prod = document.getElementById('comp-producto').value;
+  if (!prod) { showToast('Escribí el nombre del producto primero'); return; }
+  abrirLink(`https://www.preciosclaros.gob.ar/#!/buscar-productos?q=${encodeURIComponent(prod)}`);
+}
+
+// ═══════════════════════════════════════════════════
+// HISTÓRICO
+// ═══════════════════════════════════════════════════
+function renderHistorico() {
+  renderHistStats();
+  renderHistList();
+  renderChart();
+  rellenarSelectMedioHist();
+}
+
+function rellenarSelectMedioHist() {
+  const sel = document.getElementById('reg-medio');
+  if (!sel || sel.options.length > 1) return;
+  STATE.bancos.forEach(b => {
+    const opt = document.createElement('option');
+    opt.value = b.id;
+    opt.textContent = `${b.icono} ${b.entidad}`;
+    sel.appendChild(opt);
+  });
+}
+
+function renderHistStats() {
+  const el = document.getElementById('hist-stats');
+  if (!el) return;
+  const total = STATE.historial.reduce((a,c) => a + c.monto, 0);
+  const ahorro = STATE.historial.reduce((a,c) => a + (c.ahorro||0), 0);
+  const mejorSuper = moda(STATE.historial.map(h => h.lugar));
+  const mejorMedio = moda(STATE.historial.map(h => h.medio).filter(Boolean));
+  const banco = STATE.bancos.find(b => b.id === mejorMedio);
+
+  el.innerHTML = `
+    <div class="stat-box"><div class="stat-label">Gasto total</div><div class="stat-value orange">$${fmt(total)}</div></div>
+    <div class="stat-box"><div class="stat-label">Ahorro total</div><div class="stat-value green">$${fmt(ahorro)}</div></div>
+    <div class="stat-box"><div class="stat-label">Súper favorito</div><div class="stat-value">${mejorSuper || '–'}</div></div>
+    <div class="stat-box"><div class="stat-label">Mejor medio</div><div class="stat-value">${banco ? banco.icono+' '+banco.entidad.split(' ')[0] : '–'}</div></div>`;
+}
+
+function renderHistList() {
+  const el = document.getElementById('hist-list');
+  if (!el) return;
+  if (!STATE.historial.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">📊</div><p>Registrá tus compras para ver estadísticas.</p></div>`;
+    return;
+  }
+  el.innerHTML = [...STATE.historial].reverse().map(h => {
+    const banco = STATE.bancos.find(b => b.id === h.medio);
+    return `
+      <div class="hist-item">
+        <div class="hist-info">
+          <div class="hist-lugar">${h.lugar}</div>
+          <div class="hist-fecha">${h.fecha}${banco ? ' · '+banco.icono+' '+banco.entidad : ''}</div>
+        </div>
+        <div class="hist-montos">
+          <div class="hist-total">$${fmt(h.monto)}</div>
+          ${h.ahorro ? `<div class="hist-ahorro">Ahorro: $${fmt(h.ahorro)}</div>` : ''}
+        </div>
+        <button onclick="delHistorial('${h.id}')" class="lista-del">🗑️</button>
+      </div>`;
+  }).join('');
+}
+
+function renderChart() {
+  const svg = document.getElementById('chart-svg');
+  if (!svg) return;
+  const hist = STATE.historial.slice(-12);
+  if (hist.length < 2) {
+    svg.innerHTML = `<text x="50%" y="50%" text-anchor="middle" font-size="12" fill="var(--c-text2)">Registrá compras para ver el gráfico</text>`;
+    return;
+  }
+  const ahorros = hist.map((h,i) => ({ x: i, y: h.ahorro || 0 }));
+  const maxY = Math.max(...ahorros.map(p=>p.y), 1);
+  const W = 300, H = 100, PAD = 10;
+  const pts = ahorros.map((p,i) => {
+    const x = PAD + (i / (ahorros.length-1)) * (W-PAD*2);
+    const y = H - PAD - (p.y / maxY) * (H-PAD*2);
+    return `${x},${y}`;
+  }).join(' ');
+  svg.innerHTML = `
+    <polyline points="${pts}" fill="none" stroke="var(--c-accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <polyline points="${PAD},${H-PAD} ${pts} ${W-PAD},${H-PAD}" fill="rgba(232,101,26,.12)" stroke="none"/>`;
+}
+
+function toggleRegistro() {
+  const f = document.getElementById('registro-form');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+function registrarCompra() {
+  const lugar = document.getElementById('reg-lugar').value.trim();
+  const monto = parseFloat(document.getElementById('reg-monto').value);
+  const ahorro = parseFloat(document.getElementById('reg-ahorro').value) || 0;
+  const medio = document.getElementById('reg-medio').value;
+
+  if (!lugar || !monto) { showToast('Completá al menos el lugar y el monto'); return; }
+
+  STATE.historial.push({
+    id: Date.now().toString(),
+    lugar, monto, ahorro, medio,
+    fecha: new Date().toLocaleDateString('es-AR'),
+  });
+  saveLocal();
+  document.getElementById('reg-lugar').value = '';
+  document.getElementById('reg-monto').value = '';
+  document.getElementById('reg-ahorro').value = '';
+  document.getElementById('registro-form').style.display = 'none';
+  showToast('✅ Compra registrada');
+  renderHistorico();
+}
+
+function delHistorial(id) {
+  STATE.historial = STATE.historial.filter(h => h.id !== id);
+  saveLocal(); renderHistorico();
+}
+
+// ═══════════════════════════════════════════════════
+// CONFIGURACIÓN
+// ═══════════════════════════════════════════════════
+function renderConfig() {
+  applyTheme();
+  const ultima = lsGet('ultima_act', '');
+  const el = document.getElementById('config-ultima-act');
+  if (el && ultima) el.textContent = new Date(ultima).toLocaleString('es-AR');
+
+  const lista = document.getElementById('config-bancos-lista');
+  if (lista) {
+    lista.innerHTML = STATE.bancos.map(b => {
+      const bensHoy = b.beneficios.filter(ben => ben.activo);
+      return `<div class="config-row">
+        <div>
+          <div class="config-label">${b.icono} ${b.entidad}</div>
+          <div class="config-sub">${bensHoy.map(ben => `${DIAS_NOMBRES[DIAS.indexOf(ben.dia_semana)]}: ${ben.descuento_pct}%`).join(' · ')}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+async function forceRefresh() {
+  showToast('⏳ Actualizando...');
+  await loadData();
+  renderDashboard();
+  renderOfertas();
+  showToast('✅ Datos actualizados');
+}
+
+function confirmarBorrar() {
+  if (confirm('¿Borrar todo el historial de compras? Esta acción no se puede deshacer.')) {
+    STATE.historial = [];
+    saveLocal();
+    renderHistorico();
+    showToast('🗑️ Historial borrado');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════
+function fmt(n) {
+  if (!n && n !== 0) return '–';
+  return Math.round(n).toLocaleString('es-AR');
+}
+
+function categoriaEmoji(cat) {
+  const map = {
+    carnes:'🥩', lacteos:'🥛', bebidas:'🥤', limpieza:'🧹',
+    almacen:'🫙', panaderia:'🍞', frutas_verduras:'🥦',
+    higiene:'🧴', congelados:'🧊', fiambre:'🥓', mayorista:'📦',
+    red_social:'📱', general:'🏷️'
+  };
+  return map[cat] || '🏷️';
+}
+
+function moda(arr) {
+  if (!arr.length) return null;
+  const freq = {};
+  arr.forEach(v => { if(v) freq[v] = (freq[v]||0)+1; });
+  return Object.entries(freq).sort((a,b)=>b[1]-a[1])[0]?.[0];
+}
+
+function abrirLink(url) {
+  window.open(url, '_blank', 'noopener');
+}
+
+function closeExtra() {
+  document.getElementById('extra-modal').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+async function init() {
+  loadLocal();
+  applyTheme();
+
+  // Service Worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  }
+
+  // Cargar datos
+  await loadData();
+
+  // Render inicial
+  renderDashboard();
+  renderFiltroSupers();
+
+  // Ajustar nav activo
+  document.querySelectorAll('.nav-btn').forEach((b,i) => b.classList.toggle('active', i===0));
+}
+
+init();
+</script>
+</body>
+</html>

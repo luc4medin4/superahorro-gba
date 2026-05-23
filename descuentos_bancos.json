@@ -1,0 +1,369 @@
+{
+  "meta": {
+    "ultima_revision": "2025-01-01",
+    "nota": "Editar manualmente cuando cambien las promociones. Los % son orientativos y pueden tener topes mensuales.",
+    "fuente": "Información pública de cada banco/billetera"
+  },
+  "descuentos": [
+    {
+      "entidad": "Banco Nación",
+      "tipo": "banco",
+      "id": "nacion",
+      "icono": "🏛️",
+      "color": "#003087",
+      "beneficios": [
+        {
+          "dia_semana": "lunes",
+          "dia_nombre": "Lunes",
+          "supermercados": ["Carrefour", "Coto", "Día", "Changomas"],
+          "descuento_pct": 20,
+          "tope_reintegro": 2000,
+          "tope_compra": null,
+          "condicion": "Tarjeta de débito BNA",
+          "vigencia": "Verificar en bna.com.ar",
+          "activo": true
+        }
+      ]
+    },
+    {
+      "entidad": "Cuenta DNI",
+      "tipo": "billetera",
+      "id": "cuenta_dni",
+      "icono": "🪪",
+      "color": "#0066CC",
+      "beneficios": [
+        {
+          "dia_semana": "miercoles",
+          "dia_nombre": "Miércoles",
+          "supermercados": ["Día", "Carrefour", "Changomas", "Coto", "Vea"],
+          "descuento_pct": 35,
+          "tope_reintegro": 3000,
+          "tope_compra": null,
+          "condicion": "Pago con QR Cuenta DNI del Banco Provincia",
+          "vigencia": "Verificar en bancoprovincia.com.ar",
+          "activo": true
+        }
+      ]
+    },
+    {
+      "entidad": "Mercado Pago",
+      "tipo": "billetera",
+      "id": "mercadopago",
+      "icono": "💙",
+      "color": "#009EE3",
+      "beneficios": [
+        {
+          "dia_semana": "jueves",
+          "dia_nombre": "Jueves",
+          "supermercados": ["Carrefour", "Día", "Jumbo", "Disco", "Vea"],
+          "descuento_pct": 20,
+          "tope_reintegro": 1500,
+          "tope_compra": null,
+          "condicion": "Pago con QR Mercado Pago",
+          "vigencia": "Verificar en mercadopago.com.ar",
+          "activo": true
+        }
+      ]
+    },
+    {
+      "entidad": "Banco Galicia",
+      "tipo": "banco",
+      "id": "galicia",
+      "icono": "🔴",
+      "color": "#E30613",
+      "beneficios": [
+        {
+          "dia_semana": "martes",
+          "dia_nombre": "Martes",
+          "supermercados": ["Jumbo", "Disco", "Vea", "Carrefour"],
+          "descuento_pct": 25,
+          "tope_reintegro": 2500,
+          "tope_compra": null,
+          "condicion": "Tarjeta Visa/Mastercard Galicia",
+          "vigencia": "Verificar en galicia.com.ar",
+          "activo": true
+        }
+      ]
+    },
+    {
+      "entidad": "Banco Santander",
+      "tipo": "banco",
+      "id": "santander",
+      "icono": "🔴",
+      "color": "#EC0000",
+      "beneficios": [
+        {
+          "dia_semana": "viernes",
+          "dia_nombre": "Viernes",
+          "supermercados": ["Coto", "Carrefour", "Día"],
+          "descuento_pct": 20,
+          "tope_reintegro": 2000,
+          "tope_compra": null,
+          "condicion": "Tarjeta de crédito Santander",
+          "vigencia": "Verificar en santander.com.ar",
+          "activo": true
+        }
+      ]
+    },
+    {
+      "entidad": "BBVA",
+      "tipo": "banco",
+      "id": "bbva",
+      "icono": "🔵",
+      "color": "#004481",
+      "beneficios": [
+        {
+          "dia_semana": "sabado",
+          "dia_nombre": "Sábado",
+          "supermercados": ["Carrefour", "Jumbo", "Día"],
+          "descuento_pct": 20,
+          "tope_reintegro": 2000,
+          "tope_compra": null,
+          "condicion": "Tarjeta de crédito/débito BBVA",
+          "vigencia": "Verificar en bbva.com.ar",
+          "activo": true
+        }
+      ]
+    },
+    {
+      "entidad": "Banco Macro",
+      "tipo": "banco",
+      "id": "macro",
+      "icono": "🟡",
+      "color": "#FFD700",
+      "beneficios": [
+        {
+          "dia_semana": "miercoles",
+          "dia_nombre": "Miércoles",
+          "supermercados": ["Carrefour", "Coto"],
+          "descuento_pct": 15,
+          "tope_reintegro": 1500,
+          "tope_compra": null,
+          "condicion": "Tarjeta Mastercard Macro",
+          "vigencia": "Verificar en macro.com.ar",
+          "activo": true
+        }
+      ]
+    },
+    {
+      "entidad": "Banco Ciudad",
+      "tipo": "banco",
+      "id": "ciudad",
+      "icono": "🏙️",
+      "color": "#00529B",
+      "beneficios": [
+        {
+          "dia_semana": "jueves",
+          "dia_nombre": "Jueves",
+          "supermercados": ["Día", "Carrefour", "Changomas"],
+          "descuento_pct": 20,
+          "tope_reintegro": 2000,
+          "tope_compra": null,
+          "condicion": "Tarjeta de débito Banco Ciudad",
+          "vigencia": "Verificar en bancociudad.com.ar",
+          "activo": true
+        }
+      ]
+    },
+    {
+      "entidad": "Banco Provincia",
+      "tipo": "banco",
+      "id": "provincia",
+      "icono": "🏦",
+      "color": "#0066A1",
+      "beneficios": [
+        {
+          "dia_semana": "miercoles",
+          "dia_nombre": "Miércoles",
+          "supermercados": ["Día", "Carrefour", "Changomas", "Coto", "Vea"],
+          "descuento_pct": 35,
+          "tope_reintegro": 3000,
+          "tope_compra": null,
+          "condicion": "QR Cuenta DNI (Banco Provincia)",
+          "vigencia": "Verificar en bancoprovincia.com.ar",
+          "activo": true
+        }
+      ]
+    },
+    {
+      "entidad": "ICBC",
+      "tipo": "banco",
+      "id": "icbc",
+      "icono": "🔴",
+      "color": "#C8102E",
+      "beneficios": [
+        {
+          "dia_semana": "lunes",
+          "dia_nombre": "Lunes",
+          "supermercados": ["Carrefour", "Jumbo"],
+          "descuento_pct": 20,
+          "tope_reintegro": 1500,
+          "tope_compra": null,
+          "condicion": "Tarjeta Visa ICBC",
+          "vigencia": "Verificar en icbc.com.ar",
+          "activo": true
+        }
+      ]
+    },
+    {
+      "entidad": "HSBC",
+      "tipo": "banco",
+      "id": "hsbc",
+      "icono": "🔴",
+      "color": "#DB0011",
+      "beneficios": [
+        {
+          "dia_semana": "viernes",
+          "dia_nombre": "Viernes",
+          "supermercados": ["Carrefour", "Jumbo", "Disco"],
+          "descuento_pct": 20,
+          "tope_reintegro": 2000,
+          "tope_compra": null,
+          "condicion": "Tarjeta de crédito HSBC",
+          "vigencia": "Verificar en hsbc.com.ar",
+          "activo": false
+        }
+      ]
+    },
+    {
+      "entidad": "Supervielle",
+      "tipo": "banco",
+      "id": "supervielle",
+      "icono": "🟠",
+      "color": "#FF6600",
+      "beneficios": [
+        {
+          "dia_semana": "martes",
+          "dia_nombre": "Martes",
+          "supermercados": ["Coto", "Día"],
+          "descuento_pct": 15,
+          "tope_reintegro": 1500,
+          "tope_compra": null,
+          "condicion": "Tarjeta Supervielle",
+          "vigencia": "Verificar en supervielle.com",
+          "activo": true
+        }
+      ]
+    },
+    {
+      "entidad": "Banco Patagonia",
+      "tipo": "banco",
+      "id": "patagonia",
+      "icono": "🌄",
+      "color": "#007DC5",
+      "beneficios": [
+        {
+          "dia_semana": "sabado",
+          "dia_nombre": "Sábado",
+          "supermercados": ["Carrefour", "Coto"],
+          "descuento_pct": 15,
+          "tope_reintegro": 1500,
+          "tope_compra": null,
+          "condicion": "Tarjeta Visa/Mastercard Patagonia",
+          "vigencia": "Verificar en bancopatagonia.com.ar",
+          "activo": true
+        }
+      ]
+    },
+    {
+      "entidad": "Credicoop",
+      "tipo": "banco",
+      "id": "credicoop",
+      "icono": "🤝",
+      "color": "#006633",
+      "beneficios": [
+        {
+          "dia_semana": "lunes",
+          "dia_nombre": "Lunes",
+          "supermercados": ["Carrefour", "Día"],
+          "descuento_pct": 15,
+          "tope_reintegro": 1500,
+          "tope_compra": null,
+          "condicion": "Tarjeta Visa/Mastercard Credicoop",
+          "vigencia": "Verificar en bancocredicoop.com.ar",
+          "activo": true
+        }
+      ]
+    },
+    {
+      "entidad": "MODO",
+      "tipo": "billetera",
+      "id": "modo",
+      "icono": "🟣",
+      "color": "#6B21A8",
+      "beneficios": [
+        {
+          "dia_semana": "viernes",
+          "dia_nombre": "Viernes",
+          "supermercados": ["Carrefour", "Coto", "Día", "Jumbo"],
+          "descuento_pct": 20,
+          "tope_reintegro": 2000,
+          "tope_compra": null,
+          "condicion": "Pago con QR MODO",
+          "vigencia": "Verificar en modo.com.ar",
+          "activo": true
+        }
+      ]
+    },
+    {
+      "entidad": "Ualá",
+      "tipo": "billetera",
+      "id": "uala",
+      "icono": "🟤",
+      "color": "#6D28D9",
+      "beneficios": [
+        {
+          "dia_semana": "miercoles",
+          "dia_nombre": "Miércoles",
+          "supermercados": ["Día", "Changomas"],
+          "descuento_pct": 20,
+          "tope_reintegro": 1500,
+          "tope_compra": null,
+          "condicion": "Tarjeta Ualá Mastercard",
+          "vigencia": "Verificar en uala.com.ar",
+          "activo": true
+        }
+      ]
+    },
+    {
+      "entidad": "Personal Pay",
+      "tipo": "billetera",
+      "id": "personal_pay",
+      "icono": "📱",
+      "color": "#E91E8C",
+      "beneficios": [
+        {
+          "dia_semana": "jueves",
+          "dia_nombre": "Jueves",
+          "supermercados": ["Carrefour", "Día"],
+          "descuento_pct": 20,
+          "tope_reintegro": 1500,
+          "tope_compra": null,
+          "condicion": "Pago con QR Personal Pay",
+          "vigencia": "Verificar en personal.com.ar",
+          "activo": true
+        }
+      ]
+    },
+    {
+      "entidad": "NaranjaX",
+      "tipo": "billetera",
+      "id": "naranjax",
+      "icono": "🟠",
+      "color": "#FF5F00",
+      "beneficios": [
+        {
+          "dia_semana": "martes",
+          "dia_nombre": "Martes",
+          "supermercados": ["Carrefour", "Día", "Coto"],
+          "descuento_pct": 20,
+          "tope_reintegro": 2000,
+          "tope_compra": null,
+          "condicion": "Tarjeta NaranjaX Visa",
+          "vigencia": "Verificar en naranjax.com",
+          "activo": true
+        }
+      ]
+    }
+  ]
+}
