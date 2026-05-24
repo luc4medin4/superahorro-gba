@@ -1,47 +1,516 @@
-name: Scraper Diario de Ofertas
+"""
+scraper.py — SuperAhorro GBA
+Usa APIs internas de cada supermercado (sin Selenium, sin JS).
+Corre diariamente via GitHub Actions a las 7am Argentina.
+"""
 
-on:
-  schedule:
-    - cron: '0 10 * * *'
-  workflow_dispatch:
+import json
+import time
+import logging
+import re
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+from typing import Optional
 
-jobs:
-  scrape:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
+import requests
+from fake_useragent import UserAgent
 
-    steps:
-      - name: Checkout del repositorio
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+# ─── Config ───────────────────────────────────────────────────────────────────
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
+log = logging.getLogger(__name__)
 
-      - name: Configurar Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
+TZ_AR   = timezone(timedelta(hours=-3))
+AHORA   = datetime.now(TZ_AR)
+FECHA   = AHORA.strftime("%Y-%m-%d")
+FECHA_H = AHORA.strftime("%Y-%m-%dT%H:%M:%S-03:00")
 
-      - name: Instalar dependencias
-        run: |
-          pip install -r requirements.txt
+DATA_DIR = Path(__file__).parent / "data"
+DATA_DIR.mkdir(exist_ok=True)
+OUTPUT   = DATA_DIR / "ofertas.json"
 
-      - name: Correr el scraper
-        run: |
-          python scraper.py
-        env:
-          PYTHONUNBUFFERED: "1"
+try:
+    _ua = UserAgent()
+    def rnd_ua(): return _ua.random
+except Exception:
+    def rnd_ua(): return "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
-      - name: Configurar git
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Actions Bot"
+DELAY = 2
+TIMEOUT = 25
+RESULTADOS: list[dict] = []
 
-      - name: Commitear JSONs actualizados
-        run: |
-          git add data/ofertas.json
-          git diff --staged --quiet || git commit -m "🛒 Actualización automática de ofertas - $(TZ='America/Argentina/Buenos_Aires' date '+%d/%m/%Y %H:%M')"
-          git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+CATEGORIAS = {
+    "carnes":          ["carne","pollo","cerdo","asado","bife","chorizo","vacío","nalga","pechuga","costilla","milanesa"],
+    "lacteos":         ["leche","yogur","queso","manteca","crema","ricota","flan","postre"],
+    "bebidas":         ["gaseosa","agua","jugo","cerveza","vino","cola","fanta","sprite","7up","schweppes","sidra","energizante"],
+    "limpieza":        ["lavandina","detergente","jabón","suavizante","quitamanchas","limpiador","desengrasante","esponja","trapo"],
+    "almacen":         ["arroz","fideos","harina","azúcar","aceite","sal","yerba","café","te ","sopa","caldo","puré","tomate triturado","lenteja","garbanzo","poroto"],
+    "panaderia":       ["pan ","galletita","tostada","facturas","medialunas","bizcocho","budín","alfajor","oblea"],
+    "frutas_verduras": ["fruta","manzana","banana","naranja","papa","cebolla","tomate","lechuga","zanahoria","limón","mandarina"],
+    "higiene":         ["shampoo","desodorante","jabón líquido","cepillo","pasta dental","enjuague","pañal","toallita","afeitadora"],
+    "congelados":      ["congelado","medallón","nugget","pizza","helado","bastón","rebozado"],
+    "fiambre":         ["jamón","salame","paleta","mortadela","salchicha","longaniza","pepperoni","pastrón"],
+    "mayorista":       ["fardo","pack x","caja x","display","por mayor","bulto"],
+}
+
+def categorizar(nombre: str) -> str:
+    n = nombre.lower()
+    for cat, kws in CATEGORIAS.items():
+        if any(k in n for k in kws):
+            return cat
+    return "general"
+
+def oferta(producto, precio, supermercado, url,
+           precio_anterior=None, imagen_url=None,
+           categoria=None, sucursal=None, vencimiento=None) -> dict:
+    desc = None
+    if precio and precio_anterior and precio_anterior > precio:
+        desc = round((1 - precio / precio_anterior) * 100, 1)
+    return {
+        "producto":       producto.strip()[:200],
+        "precio":         round(float(precio), 2) if precio else None,
+        "precio_anterior":round(float(precio_anterior), 2) if precio_anterior else None,
+        "descuento_pct":  desc,
+        "supermercado":   supermercado,
+        "sucursal":       sucursal,
+        "categoria":      categoria or categorizar(producto),
+        "fecha_scrape":   FECHA,
+        "fecha_vencimiento": vencimiento,
+        "url_fuente":     url,
+        "imagen_url":     imagen_url,
+    }
+
+def session(referer="") -> requests.Session:
+    s = requests.Session()
+    s.headers.update({
+        "User-Agent":      rnd_ua(),
+        "Accept":          "application/json, text/plain, */*",
+        "Accept-Language": "es-AR,es;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection":      "keep-alive",
+    })
+    if referer:
+        s.headers["Referer"] = referer
+        s.headers["Origin"]  = referer.rstrip("/")
+    return s
+
+def safe_get(s, url, **kw):
+    try:
+        r = s.get(url, timeout=TIMEOUT, **kw)
+        r.raise_for_status()
+        return r
+    except Exception as e:
+        log.warning(f"  ✗ GET {url[:80]}… → {e}")
+        return None
+
+def safe_post(s, url, **kw):
+    try:
+        r = s.post(url, timeout=TIMEOUT, **kw)
+        r.raise_for_status()
+        return r
+    except Exception as e:
+        log.warning(f"  ✗ POST {url[:80]}… → {e}")
+        return None
+
+# ─── 1. CARREFOUR — API Vtex ───────────────────────────────────────────────────
+def scrape_carrefour() -> list[dict]:
+    log.info("🔵 Carrefour (Vtex API)...")
+    res = []
+    s = session("https://www.carrefour.com.ar/")
+    s.headers["x-vtex-user-agent"] = "store-graphql"
+
+    # Categorías con más volumen de ofertas
+    colecciones = [
+        ("ofertas",          "https://www.carrefour.com.ar/api/catalog_system/pub/products/search?fq=productClusterIds:140&_from=0&_to=49"),
+        ("supermercado",     "https://www.carrefour.com.ar/api/catalog_system/pub/products/search?fq=C:/Supermercado/&O=OrderByBestDiscountDESC&_from=0&_to=49"),
+        ("almacen",          "https://www.carrefour.com.ar/api/catalog_system/pub/products/search?fq=C:/Supermercado/Almacen/&O=OrderByBestDiscountDESC&_from=0&_to=29"),
+        ("lacteos",          "https://www.carrefour.com.ar/api/catalog_system/pub/products/search?fq=C:/Supermercado/Lacteos/&O=OrderByBestDiscountDESC&_from=0&_to=29"),
+        ("carnes",           "https://www.carrefour.com.ar/api/catalog_system/pub/products/search?fq=C:/Supermercado/Carnes-y-Aves/&O=OrderByBestDiscountDESC&_from=0&_to=29"),
+        ("bebidas",          "https://www.carrefour.com.ar/api/catalog_system/pub/products/search?fq=C:/Supermercado/Bebidas/&O=OrderByBestDiscountDESC&_from=0&_to=29"),
+        ("limpieza",         "https://www.carrefour.com.ar/api/catalog_system/pub/products/search?fq=C:/Limpieza/&O=OrderByBestDiscountDESC&_from=0&_to=29"),
+    ]
+
+    for nombre, url in colecciones:
+        r = safe_get(s, url)
+        if not r:
+            time.sleep(DELAY); continue
+        try:
+            productos = r.json()
+            for p in productos:
+                nombre_p = p.get("productName","")
+                items = p.get("items",[])
+                if not items: continue
+                sellers = items[0].get("sellers",[])
+                if not sellers: continue
+                offer = sellers[0].get("commertialOffer",{})
+                precio     = offer.get("Price")
+                precio_ant = offer.get("ListPrice")
+                if not precio: continue
+                img = items[0].get("images",[{}])[0].get("imageUrl","")
+                link = f"https://www.carrefour.com.ar/{p.get('linkText','')}/p"
+                res.append(oferta(
+                    producto=nombre_p, precio=precio,
+                    precio_anterior=precio_ant if precio_ant and precio_ant > precio else None,
+                    supermercado="Carrefour", url=link, imagen_url=img or None,
+                ))
+        except Exception as e:
+            log.warning(f"  Carrefour parse error ({nombre}): {e}")
+        time.sleep(DELAY)
+
+    log.info(f"  → {len(res)} de Carrefour")
+    return res
+
+# ─── 2. DÍA — API Vtex ────────────────────────────────────────────────────────
+def scrape_dia() -> list[dict]:
+    log.info("🔴 Día (Vtex API)...")
+    res = []
+    s = session("https://diaonline.supermercadosdia.com.ar/")
+
+    urls = [
+        "https://diaonline.supermercadosdia.com.ar/api/catalog_system/pub/products/search?fq=productClusterIds:1089&O=OrderByBestDiscountDESC&_from=0&_to=49",
+        "https://diaonline.supermercadosdia.com.ar/api/catalog_system/pub/products/search?fq=C:/Almacen/&O=OrderByBestDiscountDESC&_from=0&_to=29",
+        "https://diaonline.supermercadosdia.com.ar/api/catalog_system/pub/products/search?fq=C:/Lacteos-y-Frescos/&O=OrderByBestDiscountDESC&_from=0&_to=29",
+        "https://diaonline.supermercadosdia.com.ar/api/catalog_system/pub/products/search?fq=C:/Bebidas/&O=OrderByBestDiscountDESC&_from=0&_to=29",
+        "https://diaonline.supermercadosdia.com.ar/api/catalog_system/pub/products/search?fq=C:/Limpieza/&O=OrderByBestDiscountDESC&_from=0&_to=29",
+    ]
+
+    for url in urls:
+        r = safe_get(s, url)
+        if not r: time.sleep(DELAY); continue
+        try:
+            for p in r.json():
+                nombre_p = p.get("productName","")
+                items = p.get("items",[])
+                if not items: continue
+                sellers = items[0].get("sellers",[])
+                if not sellers: continue
+                offer = sellers[0].get("commertialOffer",{})
+                precio     = offer.get("Price")
+                precio_ant = offer.get("ListPrice")
+                if not precio: continue
+                img  = items[0].get("images",[{}])[0].get("imageUrl","")
+                link = f"https://diaonline.supermercadosdia.com.ar/{p.get('linkText','')}/p"
+                res.append(oferta(
+                    producto=nombre_p, precio=precio,
+                    precio_anterior=precio_ant if precio_ant and precio_ant > precio else None,
+                    supermercado="Día", url=link, imagen_url=img or None,
+                ))
+        except Exception as e:
+            log.warning(f"  Día parse error: {e}")
+        time.sleep(DELAY)
+
+    log.info(f"  → {len(res)} de Día")
+    return res
+
+# ─── 3. COTO — API propia ─────────────────────────────────────────────────────
+def scrape_coto() -> list[dict]:
+    log.info("🟡 Coto (API JSON)...")
+    res = []
+    s = session("https://www.cotodigital3.com.ar/")
+    s.headers["Accept"] = "application/json, text/javascript, */*; q=0.01"
+    s.headers["X-Requested-With"] = "XMLHttpRequest"
+
+    categorias_coto = [
+        ("Almacén",  "/sitios/cdigi/browse?_dyncharset=utf-8&Dy=1&Nrpp=48&Nu=P_Def_Or&Nrp=0&N=4294964729"),
+        ("Lácteos",  "/sitios/cdigi/browse?_dyncharset=utf-8&Dy=1&Nrpp=48&Nu=P_Def_Or&Nrp=0&N=4294964762"),
+        ("Bebidas",  "/sitios/cdigi/browse?_dyncharset=utf-8&Dy=1&Nrpp=48&Nu=P_Def_Or&Nrp=0&N=4294964765"),
+        ("Limpieza", "/sitios/cdigi/browse?_dyncharset=utf-8&Dy=1&Nrpp=48&Nu=P_Def_Or&Nrp=0&N=4294964755"),
+    ]
+    base = "https://www.cotodigital3.com.ar"
+
+    for cat_nombre, path in categorias_coto:
+        r = safe_get(s, base + path)
+        if not r: time.sleep(DELAY); continue
+        try:
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(r.text, "lxml")
+            items = soup.select(".product-card, .catalogEntryContentCell")
+            for item in items:
+                nombre_el = item.select_one(".product-name, .description")
+                precio_el = item.select_one(".atg_store_newPrice, .price-value")
+                prev_el   = item.select_one(".atg_store_oldPrice")
+                img_el    = item.select_one("img")
+                link_el   = item.select_one("a[href]")
+                if not nombre_el or not precio_el: continue
+                precio = _parse_precio(precio_el.get_text())
+                precio_ant = _parse_precio(prev_el.get_text()) if prev_el else None
+                if not precio: continue
+                res.append(oferta(
+                    producto=nombre_el.get_text(strip=True),
+                    precio=precio, precio_anterior=precio_ant,
+                    supermercado="Coto",
+                    url=base+(link_el["href"] if link_el else ""),
+                    imagen_url=img_el.get("src") if img_el else None,
+                    categoria=categorizar(nombre_el.get_text()),
+                ))
+        except Exception as e:
+            log.warning(f"  Coto parse error: {e}")
+        time.sleep(DELAY)
+
+    log.info(f"  → {len(res)} de Coto")
+    return res
+
+# ─── 4. JUMBO — API Vtex ──────────────────────────────────────────────────────
+def scrape_jumbo() -> list[dict]:
+    log.info("🔵 Jumbo (Vtex API)...")
+    res = []
+    s = session("https://www.jumbo.com.ar/")
+
+    urls = [
+        "https://www.jumbo.com.ar/api/catalog_system/pub/products/search?fq=productClusterIds:527&O=OrderByBestDiscountDESC&_from=0&_to=49",
+        "https://www.jumbo.com.ar/api/catalog_system/pub/products/search?fq=C:/Almacen/&O=OrderByBestDiscountDESC&_from=0&_to=29",
+        "https://www.jumbo.com.ar/api/catalog_system/pub/products/search?fq=C:/Lacteos/&O=OrderByBestDiscountDESC&_from=0&_to=29",
+        "https://www.jumbo.com.ar/api/catalog_system/pub/products/search?fq=C:/Bebidas/&O=OrderByBestDiscountDESC&_from=0&_to=29",
+    ]
+
+    for url in urls:
+        r = safe_get(s, url)
+        if not r: time.sleep(DELAY); continue
+        try:
+            for p in r.json():
+                nombre_p = p.get("productName","")
+                items = p.get("items",[])
+                if not items: continue
+                sellers = items[0].get("sellers",[])
+                if not sellers: continue
+                offer  = sellers[0].get("commertialOffer",{})
+                precio     = offer.get("Price")
+                precio_ant = offer.get("ListPrice")
+                if not precio: continue
+                img  = items[0].get("images",[{}])[0].get("imageUrl","")
+                link = f"https://www.jumbo.com.ar/{p.get('linkText','')}/p"
+                res.append(oferta(
+                    producto=nombre_p, precio=precio,
+                    precio_anterior=precio_ant if precio_ant and precio_ant > precio else None,
+                    supermercado="Jumbo", url=link, imagen_url=img or None,
+                ))
+        except Exception as e:
+            log.warning(f"  Jumbo parse error: {e}")
+        time.sleep(DELAY)
+
+    log.info(f"  → {len(res)} de Jumbo")
+    return res
+
+# ─── 5. CHANGOMAS — API Vtex ──────────────────────────────────────────────────
+def scrape_changomas() -> list[dict]:
+    log.info("🟢 Changomas (Vtex API)...")
+    res = []
+    s = session("https://www.masonline.com.ar/")
+
+    urls = [
+        "https://www.masonline.com.ar/api/catalog_system/pub/products/search?fq=productClusterIds:158&O=OrderByBestDiscountDESC&_from=0&_to=49",
+        "https://www.masonline.com.ar/api/catalog_system/pub/products/search?fq=C:/Almacen/&O=OrderByBestDiscountDESC&_from=0&_to=29",
+        "https://www.masonline.com.ar/api/catalog_system/pub/products/search?fq=C:/Bebidas/&O=OrderByBestDiscountDESC&_from=0&_to=29",
+    ]
+
+    for url in urls:
+        r = safe_get(s, url)
+        if not r: time.sleep(DELAY); continue
+        try:
+            data = r.json()
+            if not isinstance(data, list): continue
+            for p in data:
+                nombre_p = p.get("productName","")
+                items = p.get("items",[])
+                if not items: continue
+                sellers = items[0].get("sellers",[])
+                if not sellers: continue
+                offer  = sellers[0].get("commertialOffer",{})
+                precio     = offer.get("Price")
+                precio_ant = offer.get("ListPrice")
+                if not precio: continue
+                img  = items[0].get("images",[{}])[0].get("imageUrl","")
+                link = f"https://www.masonline.com.ar/{p.get('linkText','')}/p"
+                res.append(oferta(
+                    producto=nombre_p, precio=precio,
+                    precio_anterior=precio_ant if precio_ant and precio_ant > precio else None,
+                    supermercado="Changomas", url=link, imagen_url=img or None,
+                ))
+        except Exception as e:
+            log.warning(f"  Changomas parse error: {e}")
+        time.sleep(DELAY)
+
+    log.info(f"  → {len(res)} de Changomas")
+    return res
+
+# ─── 6. VEA ───────────────────────────────────────────────────────────────────
+def scrape_vea() -> list[dict]:
+    log.info("🟦 Vea (Vtex API)...")
+    res = []
+    s = session("https://www.vea.com.ar/")
+
+    urls = [
+        "https://www.vea.com.ar/api/catalog_system/pub/products/search?fq=C:/Almacen/&O=OrderByBestDiscountDESC&_from=0&_to=29",
+        "https://www.vea.com.ar/api/catalog_system/pub/products/search?fq=C:/Bebidas/&O=OrderByBestDiscountDESC&_from=0&_to=29",
+        "https://www.vea.com.ar/api/catalog_system/pub/products/search?fq=C:/Lacteos/&O=OrderByBestDiscountDESC&_from=0&_to=29",
+    ]
+
+    for url in urls:
+        r = safe_get(s, url)
+        if not r: time.sleep(DELAY); continue
+        try:
+            for p in r.json():
+                nombre_p = p.get("productName","")
+                items = p.get("items",[])
+                if not items: continue
+                sellers = items[0].get("sellers",[])
+                if not sellers: continue
+                offer  = sellers[0].get("commertialOffer",{})
+                precio     = offer.get("Price")
+                precio_ant = offer.get("ListPrice")
+                if not precio: continue
+                img  = items[0].get("images",[{}])[0].get("imageUrl","")
+                link = f"https://www.vea.com.ar/{p.get('linkText','')}/p"
+                res.append(oferta(
+                    producto=nombre_p, precio=precio,
+                    precio_anterior=precio_ant if precio_ant and precio_ant > precio else None,
+                    supermercado="Vea", url=link, imagen_url=img or None,
+                ))
+        except Exception as e:
+            log.warning(f"  Vea parse error: {e}")
+        time.sleep(DELAY)
+
+    log.info(f"  → {len(res)} de Vea")
+    return res
+
+# ─── 7. MAXICONSUMO — scraping HTML ────────────────────────────────────────────
+def scrape_maxiconsumo() -> list[dict]:
+    log.info("🟤 Maxiconsumo (HTML)...")
+    res = []
+    s = session("https://www.maxiconsumo.com/")
+    from bs4 import BeautifulSoup
+
+    urls = [
+        "https://www.maxiconsumo.com/ofertas-especiales",
+        "https://www.maxiconsumo.com/almacen",
+        "https://www.maxiconsumo.com/bebidas",
+    ]
+
+    for url in urls:
+        r = safe_get(s, url)
+        if not r: time.sleep(DELAY); continue
+        try:
+            soup = BeautifulSoup(r.text, "lxml")
+            items = soup.select(".product-item-info, .item.product")
+            for item in items:
+                nombre_el = item.select_one(".product-item-name, .product-name")
+                precio_el = item.select_one(".special-price .price, .price")
+                prev_el   = item.select_one(".old-price .price, .regular-price .price")
+                img_el    = item.select_one("img.product-image-photo, img")
+                link_el   = item.select_one("a.product-item-link, a")
+                if not nombre_el or not precio_el: continue
+                precio = _parse_precio(precio_el.get_text())
+                precio_ant = _parse_precio(prev_el.get_text()) if prev_el else None
+                if not precio: continue
+                res.append(oferta(
+                    producto=nombre_el.get_text(strip=True),
+                    precio=precio, precio_anterior=precio_ant,
+                    supermercado="Maxiconsumo",
+                    url=link_el["href"] if link_el and link_el.get("href") else url,
+                    imagen_url=img_el.get("src") if img_el else None,
+                    categoria="mayorista",
+                ))
+        except Exception as e:
+            log.warning(f"  Maxiconsumo parse error: {e}")
+        time.sleep(DELAY)
+
+    log.info(f"  → {len(res)} de Maxiconsumo")
+    return res
+
+# ─── 8. DIARCO — HTML ─────────────────────────────────────────────────────────
+def scrape_diarco() -> list[dict]:
+    log.info("🟤 Diarco (HTML)...")
+    res = []
+    s = session("https://www.diarco.com.ar/")
+    from bs4 import BeautifulSoup
+
+    r = safe_get(s, "https://www.diarco.com.ar/ofertas")
+    if not r:
+        log.warning("  → Diarco no respondió")
+        return []
+    try:
+        soup = BeautifulSoup(r.text, "lxml")
+        items = soup.select(".product-card, .product, article")
+        for item in items:
+            nombre_el = item.select_one("h2,h3,h4,.title,.name")
+            precio_el = item.select_one(".price,[class*='price']")
+            img_el    = item.select_one("img")
+            if not nombre_el or not precio_el: continue
+            precio = _parse_precio(precio_el.get_text())
+            if not precio: continue
+            res.append(oferta(
+                producto=nombre_el.get_text(strip=True),
+                precio=precio, supermercado="Diarco",
+                url="https://www.diarco.com.ar/ofertas",
+                imagen_url=img_el.get("src") if img_el else None,
+                categoria="mayorista",
+            ))
+    except Exception as e:
+        log.warning(f"  Diarco parse error: {e}")
+
+    log.info(f"  → {len(res)} de Diarco")
+    return res
+
+# ─── Helpers ───────────────────────────────────────────────────────────────────
+def _parse_precio(txt: str) -> Optional[float]:
+    if not txt: return None
+    limpio = re.sub(r"[^\d,.]","", txt.strip())
+    limpio = limpio.replace(".","").replace(",",".")
+    try: return round(float(limpio), 2)
+    except: return None
+
+# ─── MAIN ──────────────────────────────────────────────────────────────────────
+def main():
+    log.info("="*55)
+    log.info(f"SuperAhorro GBA — Scraper {FECHA_H}")
+    log.info("="*55)
+
+    scrapers = [
+        ("Carrefour",   scrape_carrefour),
+        ("Día",         scrape_dia),
+        ("Coto",        scrape_coto),
+        ("Jumbo",       scrape_jumbo),
+        ("Changomas",   scrape_changomas),
+        ("Vea",         scrape_vea),
+        ("Maxiconsumo", scrape_maxiconsumo),
+        ("Diarco",      scrape_diarco),
+    ]
+
+    for nombre, fn in scrapers:
+        try:
+            items = fn()
+            # Solo guardar si tiene descuento o precio concreto
+            validos = [i for i in items if i.get("precio")]
+            RESULTADOS.extend(validos)
+        except Exception as e:
+            log.error(f"❌ Error crítico en {nombre}: {e}")
+
+    # Deduplicar
+    vistos, unicos = set(), []
+    for o in RESULTADOS:
+        key = (o["producto"][:60], o["supermercado"], o["precio"])
+        if key not in vistos:
+            vistos.add(key)
+            unicos.append(o)
+
+    # Ordenar por % descuento
+    unicos.sort(key=lambda x: x.get("descuento_pct") or 0, reverse=True)
+
+    output = {
+        "meta": {
+            "ultima_actualizacion": FECHA_H,
+            "fecha":                FECHA,
+            "total_ofertas":        len(unicos),
+            "supermercados":        sorted({o["supermercado"] for o in unicos}),
+        },
+        "ofertas": unicos,
+    }
+
+    with open(OUTPUT, "w", encoding="utf-8") as f:
+        json.dump(output, f, ensure_ascii=False, indent=2)
+
+    log.info("="*55)
+    log.info(f"✅ {len(unicos)} ofertas únicas guardadas en {OUTPUT}")
+    log.info("="*55)
+
+if __name__ == "__main__":
+    main()
